@@ -1,0 +1,13 @@
+# Bulk A-record upsert. Run: cfcn dns bulk bulk-dns.yaml
+#
+# Any record where proxied is omitted defaults to false (DNS-only / grey cloud).
+records:
+  - name: app1.example.com
+    ip: 10.0.0.10
+    proxied: false
+  - name: app2.example.com
+    ip: 10.0.0.11
+    proxied: true
+  - name: api.example.com
+    ip: 10.0.0.12
+    proxied: true
