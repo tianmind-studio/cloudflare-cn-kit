@@ -1,4 +1,4 @@
-name: shellcheck
+name: ci
 
 on:
   push:
@@ -16,3 +16,12 @@ jobs:
           SHELLCHECK_OPTS: -x -e SC1091 -e SC2155
         with:
           scandir: "./bin ./lib"
+
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats + jq
+        run: sudo apt-get update && sudo apt-get install -y bats jq
+      - name: Run smoke tests
+        run: bats tests/
