@@ -15,7 +15,7 @@
 #
 # Commands:
 #   zone list | show | ssl | purge
-#   dns  list | add | del | bulk | wildcard
+#   dns  list | add | del | bulk | wildcard | export
 #   ssl  diag | mode | hsts
 #   cn   ping | trace
 #   doctor
@@ -53,6 +53,7 @@ Commands:
   dns del <fqdn>                  Delete an A record.
   dns bulk <yaml-file>            Apply a bulk DNS yaml (see examples/).
   dns wildcard <domain> <ip>      Create *.domain A record (multi-tenant SaaS).
+  dns export <zone> [--out f]     Dump a zone to bulk-compatible YAML.
 
   ssl diag <domain>               Diagnose Flexible-SSL redirect loops and
                                   common CN-specific HTTPS issues.

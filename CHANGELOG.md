@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `cfcn dns export <zone> [--out <file>]` — dump a zone's DNS records to
+  YAML in the same schema `cfcn dns bulk` consumes. Round-trips cleanly
+  for A records; AAAA/CNAME/MX/TXT/SRV/NS/CAA are preserved as YAML
+  comments (so you don't silently lose them during migration).
+- Typical uses: pre-migration snapshot before moving zones; GitOps review
+  of what's currently in Cloudflare; diffing two zones.
+
 ## [0.1.0] — initial public release
 
 ### Added

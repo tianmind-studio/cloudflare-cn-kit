@@ -70,6 +70,7 @@ cfcn ssl diag example.com
 | `cfcn dns del <fqdn>` | 删 A 记录 |
 | `cfcn dns bulk <yaml>` | YAML 批量上人（见 `examples/bulk-dns.yaml`） |
 | `cfcn dns wildcard <domain> <ip>` | 创建 `*.domain` A 记录（多租户 SaaS 常用） |
+| `cfcn dns export <zone> [--out f]` | 导出整个 zone 的 DNS 为 `dns bulk` 兼容 YAML |
 
 **SSL / HTTPS**：
 

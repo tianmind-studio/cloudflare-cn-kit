@@ -97,6 +97,56 @@ cfcn_dns() {
       local ip="${2:?usage: dns wildcard <domain> <ip>}"
       cfcn_dns add "*.$domain" "$ip"
       ;;
+    export)
+      # Dump a zone's DNS records to YAML compatible with 'dns bulk'.
+      # Useful for pre-migration snapshots, GitOps, or review before bulk edits.
+      local zname="${1:?usage: dns export <zone> [--out <file>]}"
+      shift
+      local out=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --out) out="$2"; shift 2 ;;
+          *) shift ;;
+        esac
+      done
+
+      local zid
+      zid=$(cfcn_zone_id "$zname") || return 1
+
+      local dest
+      dest="${out:-/dev/stdout}"
+      {
+        printf '# Exported from Cloudflare zone: %s\n' "$zname"
+        printf '# Generated: %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        printf '# Note: only A/AAAA/CNAME records are included in bulk-compatible form.\n'
+        printf '#       MX/TXT/SRV are preserved as comments for reference.\n'
+        printf 'records:\n'
+        cfcn_api GET "/zones/$zid/dns_records?per_page=200" \
+          | jq -r '.[] | @json' \
+          | while IFS= read -r record; do
+              local name type content proxied
+              name=$(jq -r '.name' <<< "$record")
+              type=$(jq -r '.type' <<< "$record")
+              content=$(jq -r '.content' <<< "$record")
+              proxied=$(jq -r '.proxied' <<< "$record")
+              case "$type" in
+                A)
+                  printf '  - name: %s\n' "$name"
+                  printf '    ip: %s\n' "$content"
+                  [[ "$proxied" == "true" ]] && printf '    proxied: true\n'
+                  ;;
+                AAAA|CNAME|MX|TXT|SRV|NS|CAA)
+                  # Preserved as a comment so you don't lose them silently.
+                  printf '  # %s %s %s (proxied=%s)\n' "$type" "$name" "$content" "$proxied"
+                  ;;
+              esac
+            done
+      } > "$dest"
+
+      if [[ -n "$out" ]]; then
+        cfcn_ok "exported $zname -> $out"
+      fi
+      ;;
     bulk)
       local file="${1:?usage: dns bulk <yaml-file>}"
       [[ ! -f "$file" ]] && { cfcn_err "not found: $file"; return 1; }
@@ -155,6 +205,7 @@ cfcn dns — DNS record operations.
   dns del <fqdn>              Delete an A record.
   dns bulk <yaml>             Apply multiple records from a YAML file.
   dns wildcard <domain> <ip>  Create *.domain A record.
+  dns export <zone> [--out f] Dump a zone to bulk-compatible YAML (stdout or file).
 EOF
       ;;
     *) cfcn_err "unknown dns subcommand: $sub"; return 2 ;;
