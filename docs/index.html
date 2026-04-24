@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>cfcn · 面向中国/香港运维的 Cloudflare CLI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="诊断 Flexible-SSL 死循环 · 批量 DNS · 中国场景 Cloudflare CLI">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0a14;
+  --bg-card: #151221;
+  --bg-code: #0f0d1b;
+  --border: #251f3d;
+  --border-bright: #3d3261;
+  --fg: #e6e0ff;
+  --fg-dim: #a39bcb;
+  --accent: #f38020;
+  --accent-bright: #ffb04a;
+  --err: #ff6b6b;
+  --ok: #7dd3c0;
+  --warn: #fcd34d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font: 400 16px/1.6 "Inter", system-ui, -apple-system, "PingFang SC", sans-serif;
+  background: var(--bg); color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+.nav {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(11,10,20,0.78);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.9rem 0;
+}
+.nav-inner {
+  max-width: 1040px; margin: 0 auto; padding: 0 1.5rem;
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+}
+.nav a.brand { font-weight: 700; color: var(--fg); text-decoration: none; }
+.nav a.brand .mono { color: var(--accent); }
+.nav-links { display: flex; gap: 1.5rem; font-size: 0.92rem; }
+.nav-links a { color: var(--fg-dim); text-decoration: none; transition: color 120ms; }
+.nav-links a:hover { color: var(--fg); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
+
+.hero {
+  padding: 6rem 0 3rem; text-align: center;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(243,128,32,0.08), transparent 50%),
+    radial-gradient(circle at 85% 35%, rgba(255,176,74,0.06), transparent 50%);
+}
+.tag {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: rgba(243,128,32,0.1);
+  border: 1px solid rgba(243,128,32,0.3);
+  border-radius: 2rem;
+  margin-bottom: 1.5rem;
+}
+h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.1; margin: 0 0 1.5rem;
+  letter-spacing: -0.02em; font-weight: 700;
+}
+h1 .mono { color: var(--accent-bright); }
+.hero p.lede {
+  font-size: 1.15rem; color: var(--fg-dim);
+  max-width: 680px; margin: 0 auto 2.5rem;
+}
+.cta {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.8rem 1.4rem; border-radius: 0.5rem;
+  background: var(--accent); color: #0b0a14;
+  font-weight: 600; text-decoration: none;
+  transition: transform 120ms;
+}
+.cta:hover { transform: translateY(-1px); }
+.cta.outline { background: transparent; color: var(--fg); border: 1px solid var(--border-bright); }
+.cta-group { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
+
+.terminal {
+  margin: 3rem auto 0; max-width: 780px;
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: 0.75rem; overflow: hidden; text-align: left;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+.terminal-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: #0a0816; border-bottom: 1px solid var(--border);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot.r { background: #ef4444; }
+.dot.y { background: #eab308; }
+.dot.g { background: #22c55e; }
+.terminal-title { margin-left: auto; font-size: 0.8rem; color: var(--fg-dim); }
+.terminal pre {
+  margin: 0; padding: 1.2rem 1.4rem;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.87rem; line-height: 1.7;
+  color: var(--fg); overflow-x: auto;
+}
+.terminal .cmt { color: var(--fg-dim); }
+.terminal .prompt { color: var(--accent); }
+.terminal .warn { color: var(--warn); }
+.terminal .err { color: var(--err); }
+.terminal .ok { color: var(--ok); }
+.terminal .tip { color: #a78bfa; }
+
+section { padding: 5rem 0; border-top: 1px solid var(--border); }
+section h2 {
+  font-size: 2rem; margin: 0 0 0.75rem;
+  letter-spacing: -0.01em;
+}
+section .subtitle { color: var(--fg-dim); margin: 0 0 2.5rem; font-size: 1.05rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.card {
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: border-color 160ms;
+}
+.card:hover { border-color: var(--border-bright); }
+.card h3 {
+  margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 600;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.card h3 .icon { color: var(--accent); }
+.card p { margin: 0; color: var(--fg-dim); font-size: 0.95rem; }
+
+footer {
+  padding: 3rem 0; text-align: center;
+  color: var(--fg-dim); font-size: 0.88rem;
+  border-top: 1px solid var(--border);
+}
+footer a { color: var(--fg-dim); }
+
+@media (max-width: 640px) {
+  .hero { padding: 3.5rem 0 2rem; }
+  section { padding: 3rem 0; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#"><span class="mono">$</span> cfcn</a>
+    <div class="nav-links">
+      <a href="#diag">杀手功能</a>
+      <a href="#commands">命令</a>
+      <a href="./flexible-ssl-loop.html">Flexible SSL 坑</a>
+      <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub →</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="tag">v0.1.1 · MIT · Scoped token</div>
+  <h1>诊断那个<br>把你坑哭的<span class="mono">Flexible SSL</span>死循环。</h1>
+  <p class="lede">
+    面向中国 / 香港运维的 Cloudflare CLI。一条命令定位<br>
+    你的站为什么在转到 Cloudflare 之后坏掉了。
+  </p>
+  <div class="cta-group">
+    <a class="cta" href="https://github.com/491034170/cloudflare-cn-kit#30-秒上手--30-second-start">30 秒上手</a>
+    <a class="cta outline" href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="terminal-title">cfcn ssl diag example.com</span>
+    </div>
+<pre><span class="prompt">$</span> <span>cfcn ssl diag example.com</span>
+
+==&gt; SSL diagnosis: example.com
+    zone:      example.com
+    ssl mode:  flexible
+    proxied:   true
+    HTTP/80:   301
+    HTTPS/443: 301
+    with -L:   000  <span class="cmt">(up to 10 redirects)</span>
+
+==&gt; Diagnosis
+<span class="warn">warn:</span> SSL mode is 'flexible' AND DNS is proxied.
+<span class="tip">→</span> This is the classic Flexible-SSL redirect loop setup.
+<span class="tip">→</span>   - CF talks to origin over HTTP, but origin (nginx)
+<span class="tip">→</span>     redirects HTTP to HTTPS. CF passes the 301, client loops.
+<span class="tip">→</span>   - Fix A: switch zone to SSL mode 'full' and install a cert.
+<span class="tip">→</span>   - Fix B: remove the 'return 301 https' from nginx and let
+<span class="tip">→</span>     CF 'Always Use HTTPS' do the redirect instead.</pre>
+  </div>
+</header>
+
+<section class="wrap" id="diag">
+  <h2>为什么这是核心</h2>
+  <p class="subtitle">迁站到 Cloudflare 后坏掉的 #1 原因。全中文运维社区搜"Cloudflare 重定向循环"都是这个。</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3><span class="icon">◆</span> 症状</h3>
+      <p>浏览器 <code class="mono">ERR_TOO_MANY_REDIRECTS</code> · <code class="mono">curl -I</code> 一遍遍返回 301 · 有时候中国 ISP 会直接给你假装成 403 / 502。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">◆</span> 根因</h3>
+      <p>CF Flexible 模式下，CF ↔ 源站走 HTTP。如果 nginx 写了 <code class="mono">return 301 https</code>，CF 就把 301 透传回浏览器，循环触发。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">◆</span> 修法</h3>
+      <p>两条干净路径：A) 改成 Full(strict) + 源站装证书 · B) 源站去掉 HTTPS 跳转，让 CF "Always Use HTTPS" 做。<a href="./flexible-ssl-loop.html">完整分析</a>。</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="commands">
+  <h2>其它命令</h2>
+  <p class="subtitle">日常 CF 运维该用的都在这里。</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3><span class="icon">⬢</span> zone</h3>
+      <p><code class="mono">list / show / ssl / purge</code> — 读你全部 zone 的 SSL 模式，切模式，清缓存。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">⬢</span> dns</h3>
+      <p><code class="mono">add / del / list / bulk / wildcard / export</code> — FQDN 自动推断 zone，YAML 批量，多租户泛解析一条命令。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">⬢</span> ssl</h3>
+      <p><code class="mono">diag / mode / hsts</code> — 除了 diag，还有 HSTS 切换。注意：HSTS 一开难撤。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">⬢</span> cn</h3>
+      <p><code class="mono">ping / trace</code> — 把你指向 itdog.cn / chinaz.com / ipip.net，不是你 laptop 上的 ping。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">⬢</span> doctor</h3>
+      <p>验证 token scope。放心跑 destructive 命令之前先来一发。</p>
+    </div>
+    <div class="card">
+      <h3><span class="icon">⬢</span> --dry-run · --json</h3>
+      <p>任何写操作都可预览。任何读操作都能出原始 JSON 喂给 jq。</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>MIT © 2026 <a href="https://tianmind.com" target="_blank" rel="noopener">Tianmind Studio</a> · <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/491034170/cloudflare-cn-kit/releases" target="_blank" rel="noopener">Releases</a></p>
+  <p>配套 · <a href="https://491034170.github.io/site-bootstrap/" target="_blank" rel="noopener">site-bootstrap</a> 部站 · <a href="https://github.com/491034170/vps-init" target="_blank" rel="noopener">vps-init</a> 装机</p>
+</footer>
+
+</body>
+</html>
