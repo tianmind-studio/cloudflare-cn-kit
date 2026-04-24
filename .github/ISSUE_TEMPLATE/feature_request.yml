@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a new command, flag, or ssl-diag pattern
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Real-world Cloudflare operation this would help with
+      description: Describe a specific thing you do repeatedly that cfcn makes painful today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: What would the command look like
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: diag-pattern
+    attributes:
+      label: (ssl diag proposals only) Symptom / root cause / fix
+      description: |
+        A new `ssl diag` pattern must tell the operator:
+          1. What they'd observe (HTTP code, browser error, etc.)
+          2. The root cause in one sentence.
+          3. The fix, ideally with two options when possible.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is a CN/HK-facing operational need, not a general CF API wrapper request (flarectl covers those)
+          required: true

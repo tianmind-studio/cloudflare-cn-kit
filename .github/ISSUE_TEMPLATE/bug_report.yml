@@ -1,0 +1,54 @@
+name: Bug report
+description: cfcn did the wrong thing against a real Cloudflare zone
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Exact command
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output
+      description: Redact token fragments and real domains if needed.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: cfcn version
+      placeholder: "run: cfcn version"
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: cfcn doctor output
+      description: Verifies your token is present with the right scopes.
+      render: shell
+
+  - type: checkboxes
+    id: token
+    attributes:
+      label: Token scope
+      description: cfcn uses scoped API tokens only. Global keys (X-Auth-Key) are intentionally unsupported.
+      options:
+        - label: I am using a scoped token with Zone:Zone:Read + Zone:DNS:Edit
+          required: true
+        - label: I confirmed the token is valid with `cfcn doctor`
+          required: true
