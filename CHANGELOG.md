@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.2] — diagnostic + workflow release
 
 ### Added
 - `cfcn dns diff <yaml>` — preview what `dns bulk <yaml>` would change,
