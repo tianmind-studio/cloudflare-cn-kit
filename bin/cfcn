@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+#
+# cfcn (cloudflare-cn-kit) — opinionated Cloudflare CLI for China/HK operators.
+#
+# Focus: the stuff Cloudflare's own dashboard makes tedious and the stuff their
+# western-centric docs don't warn you about:
+#   - Flexible SSL redirect loops (the #1 "my site is broken after moving to
+#     Cloudflare" cause from China-region support threads).
+#   - Bulk DNS operations across many zones.
+#   - ICP-record-friendly inspection (what a CN ISP might ask you to show).
+#   - Latency from multiple CN locations, not just `dig` from your laptop.
+#
+# Usage:
+#   cfcn <command> <subcommand> [args...]
+#
+# Commands:
+#   zone list | show | ssl | purge
+#   dns  list | add | del | bulk | wildcard
+#   ssl  diag | mode | hsts
+#   cn   ping | trace
+#   doctor
+#   version | help
+
+set -euo pipefail
+
+CFCN_VERSION="0.1.0"
+CFCN_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+CFCN_LIB="$CFCN_ROOT/lib"
+
+: "${CFCN_DRY_RUN:=0}"
+: "${CFCN_JSON:=0}"
+
+# shellcheck source=lib/common.sh
+source "$CFCN_LIB/common.sh"
+# shellcheck source=lib/api.sh
+source "$CFCN_LIB/api.sh"
+
+usage() {
+  cat <<'EOF'
+cfcn — Cloudflare CLI for China/HK operators.
+
+Usage:
+  cfcn <command> <subcommand> [args...]
+
+Commands:
+  zone list                       List all zones your token can access.
+  zone show <name>                Detail view of one zone (SSL mode, plan, etc.).
+  zone ssl <name> [mode]          Read or set SSL mode (off|flexible|full|strict).
+  zone purge <name> [host]        Purge cache (all or specific hostname).
+
+  dns list [zone]                 List DNS records in a zone.
+  dns add <fqdn> <ip> [--proxied] Create or update an A record.
+  dns del <fqdn>                  Delete an A record.
+  dns bulk <yaml-file>            Apply a bulk DNS yaml (see examples/).
+  dns wildcard <domain> <ip>      Create *.domain A record (multi-tenant SaaS).
+
+  ssl diag <domain>               Diagnose Flexible-SSL redirect loops and
+                                  common CN-specific HTTPS issues.
+  ssl mode <zone> [mode]          Alias for 'zone ssl'.
+  ssl hsts <zone> [on|off]        Toggle HSTS (careful!).
+
+  cn ping <host>                  Latency from multiple CN observation points.
+  cn trace <host>                 Traceroute-ish via public looking glasses.
+
+  doctor                          Verify API token + required scopes.
+  version                         Print version.
+  help                            This message.
+
+Flags:
+  --dry-run       Print actions without executing.
+  --json          Emit raw JSON instead of formatted tables (for scripting).
+
+Environment:
+  CFCN_TOKEN      Cloudflare API token (Zone:DNS:Edit + Zone:Zone:Read).
+                  Or set CF_API_TOKEN (site-bootstrap compatible).
+
+Docs: https://github.com/491034170/cloudflare-cn-kit
+EOF
+}
+
+parse_global() {
+  local remaining=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)  CFCN_DRY_RUN=1; shift ;;
+      --json)     CFCN_JSON=1; shift ;;
+      --help|-h)  usage; exit 0 ;;
+      --version|-v) echo "cfcn $CFCN_VERSION"; exit 0 ;;
+      --)         shift; remaining+=("$@"); break ;;
+      *)          remaining+=("$1"); shift ;;
+    esac
+  done
+  CFCN_ARGS=("${remaining[@]}")
+}
+
+parse_global "$@"
+set -- "${CFCN_ARGS[@]:-}"
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  zone)
+    # shellcheck source=lib/zone.sh
+    source "$CFCN_LIB/zone.sh"; cfcn_zone "$@" ;;
+  dns)
+    # shellcheck source=lib/dns.sh
+    source "$CFCN_LIB/dns.sh"; cfcn_dns "$@" ;;
+  ssl)
+    # shellcheck source=lib/ssl.sh
+    source "$CFCN_LIB/ssl.sh"; cfcn_ssl "$@" ;;
+  cn)
+    # shellcheck source=lib/cn.sh
+    source "$CFCN_LIB/cn.sh"; cfcn_cn "$@" ;;
+  doctor)
+    # shellcheck source=lib/doctor.sh
+    source "$CFCN_LIB/doctor.sh"; cfcn_doctor "$@" ;;
+  version) echo "cfcn $CFCN_VERSION" ;;
+  help|"") usage ;;
+  *)
+    cfcn_err "unknown command: $cmd"
+    echo >&2; usage >&2; exit 2 ;;
+esac
