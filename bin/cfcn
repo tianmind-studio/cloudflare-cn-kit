@@ -23,7 +23,7 @@
 
 set -euo pipefail
 
-CFCN_VERSION="0.1.0"
+CFCN_VERSION="0.1.1"
 CFCN_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
 CFCN_LIB="$CFCN_ROOT/lib"
 

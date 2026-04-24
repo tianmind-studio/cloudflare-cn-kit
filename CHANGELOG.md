@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.1] — minor feature release
 
 ### Added
 - `cfcn dns export <zone> [--out <file>]` — dump a zone's DNS records to
@@ -9,6 +9,7 @@
   comments (so you don't silently lose them during migration).
 - Typical uses: pre-migration snapshot before moving zones; GitOps review
   of what's currently in Cloudflare; diffing two zones.
+- `install.sh` — user-scope installer matching `site-bootstrap` pattern.
 
 ## [0.1.0] — initial public release
 
