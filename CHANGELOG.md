@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `cfcn dns diff <yaml>` — preview what `dns bulk <yaml>` would change,
+  without writing anything. Prints a four-way color-coded diff:
+  `+` create, `~` update (with before → after), `=` unchanged, `.`
+  unmanaged (live-only records that `dns bulk` won't touch). Completes
+  the GitOps triangle: `dns export` → edit → `dns diff` → `dns bulk`.
+
 ## [0.1.1] — minor feature release
 
 ### Added

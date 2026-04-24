@@ -69,6 +69,7 @@ cfcn ssl diag example.com
 | `cfcn dns add <fqdn> <ip> [--proxied]` | 新增或 upsert A 记录（**自动推断 zone**） |
 | `cfcn dns del <fqdn>` | 删 A 记录 |
 | `cfcn dns bulk <yaml>` | YAML 批量上人（见 `examples/bulk-dns.yaml`） |
+| `cfcn dns diff <yaml>` | 预览 `dns bulk <yaml>` 会改什么（只读，不写） |
 | `cfcn dns wildcard <domain> <ip>` | 创建 `*.domain` A 记录（多租户 SaaS 常用） |
 | `cfcn dns export <zone> [--out f]` | 导出整个 zone 的 DNS 为 `dns bulk` 兼容 YAML |
 
@@ -140,8 +141,20 @@ records:
 ```
 
 ```bash
-cfcn --dry-run dns bulk bulk-dns.yaml   # 先看一眼
+cfcn dns diff bulk-dns.yaml             # 看清楚会改什么（推荐，输出带颜色）
+cfcn --dry-run dns bulk bulk-dns.yaml   # 或者走 dry-run 路径
 cfcn dns bulk bulk-dns.yaml             # 真的跑
+```
+
+`dns diff` 输出：
+
+```
++ api.example.com    10.0.0.12 (proxied=true)            # 会创建
+~ app1.example.com   10.0.0.10 (proxied=false)  ->  10.0.0.20 (proxied=false)   # 会更新
+= app2.example.com   10.0.0.11 (proxied=true)            # 不变
+. legacy.example.com 10.0.0.99 (proxied=false)  (unmanaged — dns bulk will not touch)
+
+summary: 1 create, 1 update, 1 unchanged, 1 unmanaged
 ```
 
 多租户 SaaS 泛解析一条命令：
