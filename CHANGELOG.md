@@ -8,6 +8,23 @@
   `+` create, `~` update (with before → after), `=` unchanged, `.`
   unmanaged (live-only records that `dns bulk` won't touch). Completes
   the GitOps triangle: `dns export` → edit → `dns diff` → `dns bulk`.
+- `cfcn ssl diag` now reports the observed HSTS header and adds three
+  new diagnostic patterns:
+  - **HSTS preload trap** — warns any time the response header contains
+    `preload`. Once submitted to browser preload lists, removal takes
+    months of uncontrollable browser update cycles; most operators enable
+    `preload` without realizing this.
+  - **HSTS max-age=0** — flags an effectively-disabled HSTS that's almost
+    always a config typo.
+  - **CF 525/526** — distinct message when Cloudflare itself signals a
+    broken TLS handshake with origin (525) or invalid origin cert (526).
+    The existing Flexible-SSL pattern covered the "loop" failure mode;
+    these cover the "Full (strict) but cert broke" failure mode.
+- CN-ISP RST pattern is now refined: the previous version flagged any
+  `HTTPS 000` on a proxied zone. It now parses the curl error text and
+  distinguishes "connection reset" (the real CN-RST signature, now with
+  a specific mitigation path), "timed out" (propagation), and TLS
+  handshake failure (rare, but distinct).
 
 ## [0.1.1] — minor feature release
 
