@@ -15,7 +15,7 @@
 #
 # Commands:
 #   zone list | show | ssl | purge
-#   dns  list | add | del | bulk | wildcard | export
+#   dns  list | add | del | bulk | diff | wildcard | export
 #   ssl  diag | mode | hsts
 #   cn   ping | trace
 #   doctor
@@ -52,6 +52,7 @@ Commands:
   dns add <fqdn> <ip> [--proxied] Create or update an A record.
   dns del <fqdn>                  Delete an A record.
   dns bulk <yaml-file>            Apply a bulk DNS yaml (see examples/).
+  dns diff <yaml-file>            Preview what 'dns bulk' would change (no writes).
   dns wildcard <domain> <ip>      Create *.domain A record (multi-tenant SaaS).
   dns export <zone> [--out f]     Dump a zone to bulk-compatible YAML.
 

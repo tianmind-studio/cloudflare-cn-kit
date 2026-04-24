@@ -97,6 +97,109 @@ cfcn_dns() {
       local ip="${2:?usage: dns wildcard <domain> <ip>}"
       cfcn_dns add "*.$domain" "$ip"
       ;;
+    diff)
+      # Compare a YAML bulk file against live Cloudflare state. Shows what
+      # 'dns bulk <yaml>' would change, without touching anything.
+      #
+      # Legend:
+      #   + create  (in YAML, not in CF)
+      #   ~ update  (in YAML, differs from CF)
+      #   = same    (in YAML, matches CF)
+      #   . unmanaged (in CF but not in YAML; bulk won't touch)
+      local file="${1:?usage: dns diff <yaml-file>}"
+      [[ ! -f "$file" ]] && { cfcn_err "not found: $file"; return 1; }
+
+      # Extract records from YAML using the same parser shape as 'bulk'.
+      local yaml_records
+      yaml_records=$(awk '
+        BEGIN { cur = "" }
+        /^[[:space:]]*-[[:space:]]+name:/ {
+          if (cur != "") print cur
+          line = $0
+          sub(/^[[:space:]]*-[[:space:]]+name:[[:space:]]*/, "", line)
+          cur = "name=" line
+          next
+        }
+        /^[[:space:]]+ip:/ {
+          line = $0
+          sub(/^[[:space:]]+ip:[[:space:]]*/, "", line)
+          cur = cur "|ip=" line
+          next
+        }
+        /^[[:space:]]+proxied:/ {
+          line = $0
+          sub(/^[[:space:]]+proxied:[[:space:]]*/, "", line)
+          cur = cur "|proxied=" line
+          next
+        }
+        END { if (cur != "") print cur }
+      ' "$file")
+      [[ -z "$yaml_records" ]] && { cfcn_warn "no A records in $file"; return 0; }
+
+      # Determine which zone(s) the YAML covers (first record wins; warn if
+      # a single file mixes zones — dns bulk supports it but diff gets noisy).
+      local first_name
+      first_name=$(printf '%s\n' "$yaml_records" | head -1 | tr '|' '\n' | awk -F= '/^name=/ {print $2}')
+      local z; z=$(_cfcn_zone_for_fqdn "$first_name") || { cfcn_err "no zone found for $first_name"; return 1; }
+      local zname="${z%|*}" zid="${z#*|}"
+      cfcn_info "zone: $zname"
+
+      # Snapshot live A records into a tsv: name<TAB>ip<TAB>proxied
+      local live_tsv
+      live_tsv=$(cfcn_api GET "/zones/$zid/dns_records?type=A&per_page=200" \
+        | jq -r '.[] | [.name, .content, (.proxied|tostring)] | @tsv')
+
+      # Track which live records we've matched so we can list the rest.
+      local -A seen_names=()
+      local adds=0 updates=0 sames=0
+      local yaml_rec
+      while IFS= read -r yaml_rec; do
+        local name ip proxied="false"
+        name=$(printf '%s' "$yaml_rec" | tr '|' '\n' | awk -F= '/^name=/ {print $2}')
+        ip=$(printf '%s' "$yaml_rec" | tr '|' '\n' | awk -F= '/^ip=/ {print $2}')
+        if printf '%s' "$yaml_rec" | grep -q 'proxied=true'; then proxied="true"; fi
+        [[ -z "$name" || -z "$ip" ]] && continue
+
+        # Lookup this name in live_tsv.
+        local live_line live_ip live_proxied
+        live_line=$(printf '%s\n' "$live_tsv" | awk -F '\t' -v n="$name" '$1 == n {print; exit}')
+        if [[ -z "$live_line" ]]; then
+          printf '%s+%s %s  %s (proxied=%s)\n' "$C_GREEN" "$C_RESET" "$name" "$ip" "$proxied"
+          adds=$((adds+1))
+          continue
+        fi
+        seen_names[$name]=1
+        live_ip=$(printf '%s' "$live_line" | awk -F '\t' '{print $2}')
+        live_proxied=$(printf '%s' "$live_line" | awk -F '\t' '{print $3}')
+
+        if [[ "$live_ip" == "$ip" && "$live_proxied" == "$proxied" ]]; then
+          printf '%s=%s %s  %s (proxied=%s)\n' "$C_DIM" "$C_RESET" "$name" "$ip" "$proxied"
+          sames=$((sames+1))
+        else
+          printf '%s~%s %s  %s (proxied=%s)  ->  %s (proxied=%s)\n' \
+            "$C_YELLOW" "$C_RESET" "$name" "$live_ip" "$live_proxied" "$ip" "$proxied"
+          updates=$((updates+1))
+        fi
+      done <<< "$yaml_records"
+
+      # List live A records not covered by the YAML — informational only.
+      local unmanaged=0
+      while IFS= read -r live_line; do
+        [[ -z "$live_line" ]] && continue
+        local live_name live_ip live_proxied
+        live_name=$(printf '%s' "$live_line" | awk -F '\t' '{print $1}')
+        live_ip=$(printf '%s' "$live_line" | awk -F '\t' '{print $2}')
+        live_proxied=$(printf '%s' "$live_line" | awk -F '\t' '{print $3}')
+        [[ -n "${seen_names[$live_name]:-}" ]] && continue
+        printf '%s.%s %s  %s (proxied=%s)  %s(unmanaged — dns bulk will not touch)%s\n' \
+          "$C_DIM" "$C_RESET" "$live_name" "$live_ip" "$live_proxied" "$C_DIM" "$C_RESET"
+        unmanaged=$((unmanaged+1))
+      done <<< "$live_tsv"
+
+      printf '\n'
+      printf 'summary: %d create, %d update, %d unchanged, %d unmanaged\n' \
+        "$adds" "$updates" "$sames" "$unmanaged"
+      ;;
     export)
       # Dump a zone's DNS records to YAML compatible with 'dns bulk'.
       # Useful for pre-migration snapshots, GitOps, or review before bulk edits.
@@ -204,6 +307,7 @@ cfcn dns — DNS record operations.
                               Create or update an A record; zone is inferred.
   dns del <fqdn>              Delete an A record.
   dns bulk <yaml>             Apply multiple records from a YAML file.
+  dns diff <yaml>             Preview what 'dns bulk <yaml>' would change.
   dns wildcard <domain> <ip>  Create *.domain A record.
   dns export <zone> [--out f] Dump a zone to bulk-compatible YAML (stdout or file).
 EOF
