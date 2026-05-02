@@ -124,6 +124,53 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
+# ssl diag — mocked Cloudflare API / curl, no real token or network needed
+# ---------------------------------------------------------------------------
+
+@test "ssl diag resolves zone, ssl mode, and proxied state through loaded helpers" {
+  cat > "$TMP/curl" <<'EOF'
+#!/usr/bin/env bash
+args="$*"
+
+if [[ "$args" == *"api.cloudflare.com/client/v4/zones?name=example.com"* ]]; then
+  printf '{"success":true,"result":[{"id":"zone123","name":"example.com"}]}\n200'
+  exit 0
+fi
+
+if [[ "$args" == *"api.cloudflare.com/client/v4/zones/zone123/settings/ssl"* ]]; then
+  printf '{"success":true,"result":{"value":"flexible"}}\n200'
+  exit 0
+fi
+
+if [[ "$args" == *"api.cloudflare.com/client/v4/zones/zone123/dns_records?name=www.example.com"* ]]; then
+  printf '{"success":true,"result":[{"proxied":true}]}\n200'
+  exit 0
+fi
+
+if [[ "$args" == *"http://www.example.com"* ]]; then
+  printf '301'
+  exit 0
+fi
+
+if [[ "$args" == *"https://www.example.com"* ]]; then
+  printf '301'
+  exit 0
+fi
+
+printf 'unexpected curl call: %s\n' "$args" >&2
+exit 1
+EOF
+  chmod +x "$TMP/curl"
+
+  PATH="$TMP:$PATH" CFCN_TOKEN="dummy-token" run "$CFCN_BIN" ssl diag www.example.com
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"zone:      example.com"* ]]
+  [[ "$output" == *"ssl mode:  flexible"* ]]
+  [[ "$output" == *"proxied:   true"* ]]
+}
+
+# ---------------------------------------------------------------------------
 # --json flag plumbing — should be accepted even without a token
 # ---------------------------------------------------------------------------
 
