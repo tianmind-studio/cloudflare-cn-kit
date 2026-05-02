@@ -8,7 +8,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="MIT"/></a>
   <img src="https://img.shields.io/badge/shell-bash-4EAA25?style=flat-square&logo=gnubash&logoColor=white" alt="Bash"/>
   <img src="https://img.shields.io/badge/API-scoped_token-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Scoped Token"/>
-  <img src="https://img.shields.io/badge/status-v0.1.2-0A66C2?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/status-v0.1.3-0A66C2?style=flat-square" alt="Version"/>
 </p>
 
 ---
@@ -79,7 +79,7 @@ cfcn ssl diag example.com
 
 | 命令 | 作用 |
 |------|------|
-| `cfcn ssl diag <domain>` | ⭐ **诊断 Flexible-SSL 重定向循环 + 中国 ISP 特有的 000 返回** |
+| `cfcn ssl diag <domain> [--origin-ip <ip>]` | ⭐ **区分 Cloudflare Edge 与源站直连，诊断 Flexible-SSL 循环、证书和中国 ISP 000 返回** |
 | `cfcn ssl mode <zone> [mode]` | 设 SSL 模式（`zone ssl` 别名） |
 | `cfcn ssl hsts <zone> [on/off]` | 切 HSTS（小心，一开难撤） |
 
@@ -105,23 +105,26 @@ $ cfcn ssl diag example.com
     zone:      example.com
     ssl mode:  flexible
     proxied:   true
-    probing origin and edge...
-    HTTP/80:   301
-    HTTPS/443: 301
-    with -L:   000  (up to 10 redirects)
+    probing edge and origin...
+    Edge HTTP/80:       301
+    Edge HTTPS/443:     301
+    Edge HTTPS with -L: 000  (up to 10 redirects)
+    origin IP:          203.0.113.10 (DNS A)
+    Origin HTTP/80:     301
+    Origin HTTPS/443:   000
 ==> Diagnosis
 warn: SSL mode is 'flexible' AND DNS is proxied.
 → This is the classic Flexible-SSL redirect loop setup.
 →   - CF talks to your origin over HTTP, but your origin (nginx)
 →     redirects HTTP to HTTPS. CF receives the 301, redirects the
 →     client, client loops.
-→   - Fix option A: switch zone to SSL mode 'full' and install a
-→     cert on origin (certbot / CF Origin CA).
-→   - Fix option B: remove the 'return 301 https' from nginx and
-→     let CF 'Always Use HTTPS' do the redirect instead.
+warn: direct origin HTTP redirects, but direct origin HTTPS is unreachable.
+→ Likely origin has no valid cert installed while nginx force-redirects to HTTPS.
+→   - If using CF Flexible: DON'T redirect on origin. Let CF redirect.
+→   - If using CF Full/Strict: install or renew an origin cert.
 ```
 
-完整原理和两种修法见 [`docs/flexible-ssl-loop.md`](./docs/flexible-ssl-loop.md)。
+完整原理和两种修法见 [`docs/flexible-ssl-loop.md`](./docs/flexible-ssl-loop.md)。如果 DNS 是 proxied CNAME、负载均衡或多源站，`cfcn` 无法可靠从 Cloudflare 记录反推出源站 IP；这时用 `cfcn ssl diag <domain> --origin-ip <ip>` 指定一次性直连探测地址。
 
 ---
 

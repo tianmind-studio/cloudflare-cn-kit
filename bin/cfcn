@@ -16,14 +16,14 @@
 # Commands:
 #   zone list | show | ssl | purge
 #   dns  list | add | del | bulk | diff | wildcard | export
-#   ssl  diag | mode | hsts
+#   ssl  diag [--origin-ip] | mode | hsts
 #   cn   ping | trace
 #   doctor
 #   version | help
 
 set -euo pipefail
 
-CFCN_VERSION="0.1.2"
+CFCN_VERSION="0.1.3"
 CFCN_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
 CFCN_LIB="$CFCN_ROOT/lib"
 
@@ -56,7 +56,7 @@ Commands:
   dns wildcard <domain> <ip>      Create *.domain A record (multi-tenant SaaS).
   dns export <zone> [--out f]     Dump a zone to bulk-compatible YAML.
 
-  ssl diag <domain>               Diagnose Flexible-SSL redirect loops and
+  ssl diag <domain> [--origin-ip <ip>] Diagnose Flexible-SSL redirect loops,
                                   common CN-specific HTTPS issues.
   ssl mode <zone> [mode]          Alias for 'zone ssl'.
   ssl hsts <zone> [on|off]        Toggle HSTS (careful!).

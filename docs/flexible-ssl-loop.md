@@ -99,5 +99,14 @@ Put this in your install runbook:
 cfcn ssl diag example.com
 ```
 
-before declaring a new deploy "done". It's ~2 seconds and catches every
-permutation of this trap I've seen.
+before declaring a new deploy "done". `cfcn` now prints Cloudflare Edge and
+Direct Origin probes separately, so you can tell whether a failure comes from
+Cloudflare mode/edge path or from the origin's redirect/TLS setup. For proxied
+A/AAAA records the origin IP is inferred from DNS; for CNAME or multi-origin
+setups, pass it explicitly:
+
+```bash
+cfcn ssl diag example.com --origin-ip 203.0.113.10
+```
+
+It's ~2 seconds and catches every permutation of this trap I've seen.
