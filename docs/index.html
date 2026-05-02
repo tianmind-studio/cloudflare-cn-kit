@@ -167,29 +167,31 @@ footer a { color: var(--fg-dim); }
       <a href="#diag">杀手功能</a>
       <a href="#commands">命令</a>
       <a href="./flexible-ssl-loop.html">Flexible SSL 坑</a>
-      <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub →</a>
+      <a href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub →</a>
     </div>
   </div>
 </nav>
 
 <header class="hero wrap">
-  <div class="tag">v0.1.1 · MIT · Scoped token</div>
+  <div class="tag">v0.1.2 · MIT · Scoped token</div>
   <h1>诊断那个<br>把你坑哭的<span class="mono">Flexible SSL</span>死循环。</h1>
   <p class="lede">
     面向中国 / 香港运维的 Cloudflare CLI。一条命令定位<br>
     你的站为什么在转到 Cloudflare 之后坏掉了。
   </p>
   <div class="cta-group">
-    <a class="cta" href="https://github.com/491034170/cloudflare-cn-kit#30-秒上手--30-second-start">30 秒上手</a>
-    <a class="cta outline" href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a>
+    <a class="cta" href="https://github.com/tianmind-studio/cloudflare-cn-kit#30-秒上手--30-second-start">30 秒上手</a>
+    <a class="cta outline" href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a>
   </div>
 
   <div class="terminal">
     <div class="terminal-bar">
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="terminal-title">cfcn ssl diag example.com</span>
+      <span class="terminal-title">install + cfcn ssl diag</span>
     </div>
-<pre><span class="prompt">$</span> <span>cfcn ssl diag example.com</span>
+<pre><span class="prompt">$</span> <span>curl -fsSL https://raw.githubusercontent.com/tianmind-studio/cloudflare-cn-kit/main/install.sh | bash</span>
+<span class="prompt">$</span> <span>export CFCN_TOKEN="***"</span>
+<span class="prompt">$</span> <span>cfcn ssl diag example.com</span>
 
 ==&gt; SSL diagnosis: example.com
     zone:      example.com
@@ -263,8 +265,8 @@ footer a { color: var(--fg-dim); }
 </section>
 
 <footer>
-  <p>MIT © 2026 <a href="https://tianmind.com" target="_blank" rel="noopener">Tianmind Studio</a> · <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/491034170/cloudflare-cn-kit/releases" target="_blank" rel="noopener">Releases</a></p>
-  <p>配套 · <a href="https://491034170.github.io/site-bootstrap/" target="_blank" rel="noopener">site-bootstrap</a> 部站 · <a href="https://github.com/491034170/vps-init" target="_blank" rel="noopener">vps-init</a> 装机</p>
+  <p>MIT © 2026 <a href="https://tianmind.com" target="_blank" rel="noopener">Tianmind Studio</a> · <a href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/tianmind-studio/cloudflare-cn-kit/releases" target="_blank" rel="noopener">Releases</a></p>
+  <p>配套 · <a href="https://tianmind-studio.github.io/site-bootstrap/" target="_blank" rel="noopener">site-bootstrap</a> 部站 · <a href="https://github.com/tianmind-studio/vps-init" target="_blank" rel="noopener">vps-init</a> 装机</p>
 </footer>
 
 </body>
