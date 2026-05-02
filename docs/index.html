@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>cfcn · 面向中国/香港运维的 Cloudflare CLI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="诊断 Flexible-SSL 死循环 · 批量 DNS · 中国场景 Cloudflare CLI">
+<meta name="description" content="区分 Cloudflare Edge 与源站直连 · 诊断 Flexible-SSL 死循环 · 批量 DNS · 中国场景 Cloudflare CLI">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -167,46 +167,51 @@ footer a { color: var(--fg-dim); }
       <a href="#diag">杀手功能</a>
       <a href="#commands">命令</a>
       <a href="./flexible-ssl-loop.html">Flexible SSL 坑</a>
-      <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub →</a>
+      <a href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub →</a>
     </div>
   </div>
 </nav>
 
 <header class="hero wrap">
-  <div class="tag">v0.1.1 · MIT · Scoped token</div>
+  <div class="tag">v0.1.3 · MIT · Scoped token</div>
   <h1>诊断那个<br>把你坑哭的<span class="mono">Flexible SSL</span>死循环。</h1>
   <p class="lede">
     面向中国 / 香港运维的 Cloudflare CLI。一条命令定位<br>
     你的站为什么在转到 Cloudflare 之后坏掉了。
   </p>
   <div class="cta-group">
-    <a class="cta" href="https://github.com/491034170/cloudflare-cn-kit#30-秒上手--30-second-start">30 秒上手</a>
-    <a class="cta outline" href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a>
+    <a class="cta" href="https://github.com/tianmind-studio/cloudflare-cn-kit#30-秒上手--30-second-start">30 秒上手</a>
+    <a class="cta outline" href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a>
   </div>
 
   <div class="terminal">
     <div class="terminal-bar">
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-      <span class="terminal-title">cfcn ssl diag example.com</span>
+      <span class="terminal-title">install + cfcn ssl diag</span>
     </div>
-<pre><span class="prompt">$</span> <span>cfcn ssl diag example.com</span>
+<pre><span class="prompt">$</span> <span>curl -fsSL https://raw.githubusercontent.com/tianmind-studio/cloudflare-cn-kit/main/install.sh | bash</span>
+<span class="prompt">$</span> <span>export CFCN_TOKEN="***"</span>
+<span class="prompt">$</span> <span>cfcn ssl diag example.com</span>
 
 ==&gt; SSL diagnosis: example.com
     zone:      example.com
     ssl mode:  flexible
     proxied:   true
-    HTTP/80:   301
-    HTTPS/443: 301
-    with -L:   000  <span class="cmt">(up to 10 redirects)</span>
+    probing edge and origin...
+    Edge HTTP/80:       301
+    Edge HTTPS/443:     301
+    Edge HTTPS with -L: 000  <span class="cmt">(up to 10 redirects)</span>
+    origin IP:          203.0.113.10 <span class="cmt">(DNS A)</span>
+    Origin HTTP/80:     301
+    Origin HTTPS/443:   000
 
 ==&gt; Diagnosis
 <span class="warn">warn:</span> SSL mode is 'flexible' AND DNS is proxied.
 <span class="tip">→</span> This is the classic Flexible-SSL redirect loop setup.
 <span class="tip">→</span>   - CF talks to origin over HTTP, but origin (nginx)
 <span class="tip">→</span>     redirects HTTP to HTTPS. CF passes the 301, client loops.
-<span class="tip">→</span>   - Fix A: switch zone to SSL mode 'full' and install a cert.
-<span class="tip">→</span>   - Fix B: remove the 'return 301 https' from nginx and let
-<span class="tip">→</span>     CF 'Always Use HTTPS' do the redirect instead.</pre>
+<span class="warn">warn:</span> direct origin HTTP redirects, but direct origin HTTPS is unreachable.
+<span class="tip">→</span> Likely origin has no valid cert installed while nginx force-redirects to HTTPS.</pre>
   </div>
 </header>
 
@@ -263,8 +268,8 @@ footer a { color: var(--fg-dim); }
 </section>
 
 <footer>
-  <p>MIT © 2026 <a href="https://tianmind.com" target="_blank" rel="noopener">Tianmind Studio</a> · <a href="https://github.com/491034170/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/491034170/cloudflare-cn-kit/releases" target="_blank" rel="noopener">Releases</a></p>
-  <p>配套 · <a href="https://491034170.github.io/site-bootstrap/" target="_blank" rel="noopener">site-bootstrap</a> 部站 · <a href="https://github.com/491034170/vps-init" target="_blank" rel="noopener">vps-init</a> 装机</p>
+  <p>MIT © 2026 <a href="https://tianmind.com" target="_blank" rel="noopener">Tianmind Studio</a> · <a href="https://github.com/tianmind-studio/cloudflare-cn-kit" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/tianmind-studio/cloudflare-cn-kit/releases" target="_blank" rel="noopener">Releases</a></p>
+  <p>配套 · <a href="https://tianmind-studio.github.io/site-bootstrap/" target="_blank" rel="noopener">site-bootstrap</a> 部站 · <a href="https://github.com/tianmind-studio/vps-init" target="_blank" rel="noopener">vps-init</a> 装机</p>
 </footer>
 
 </body>
