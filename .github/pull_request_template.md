@@ -8,10 +8,10 @@
 
 ## Test plan
 
-- [ ] `shellcheck -x -e SC1091 bin/site-bootstrap lib/*.sh install.sh` passes
+- [ ] `shellcheck -x -e SC1091 bin/cfcn lib/*.sh install.sh` passes
 - [ ] `bats tests/` passes
-- [ ] `./bin/site-bootstrap --help` and `doctor` still work
-- [ ] If deploy logic changed: `--dry-run deploy` against a minimal `site.yaml` prints the expected steps
+- [ ] `./bin/cfcn --help`, `./bin/cfcn version`, and `./bin/cfcn doctor` still work
+- [ ] If DNS/SSL logic changed: token-free smoke tests or mocked tests cover the changed path
 - [ ] If a new command/flag was added: a smoke test covers it in `tests/smoke.bats`
 
 ## Scope

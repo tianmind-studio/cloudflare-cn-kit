@@ -6,6 +6,9 @@ cfcn_ssl() {
   case "$sub" in
     diag)
       local domain="${1:?usage: ssl diag <domain>}"
+      # ssl diag needs the FQDN -> zone helper shared with DNS commands.
+      # shellcheck source=lib/dns.sh
+      source "$CFCN_LIB/dns.sh"
       _cfcn_ssl_diag "$domain"
       ;;
     mode)
