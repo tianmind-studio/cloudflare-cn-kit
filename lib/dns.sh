@@ -34,7 +34,7 @@ cfcn_dns() {
         local zones
         zones=$(cfcn_api GET "/zones?per_page=50" | jq -r '.[] | [.name, .id] | @tsv')
         printf '%-40s %-16s %-6s %s\n' NAME CONTENT TYPE PROXIED
-        while IFS=$'\t' read -r zn zid; do
+        while IFS=$'\t' read -r _zn zid; do
           cfcn_api GET "/zones/$zid/dns_records?per_page=100" \
             | jq -r '.[] | [.name, .content, .type, .proxied] | @tsv' \
             | awk -F '\t' '{printf "%-40s %-16s %-6s %s\n", $1, $2, $3, $4}'

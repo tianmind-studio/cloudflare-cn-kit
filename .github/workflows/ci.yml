@@ -10,12 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
-        env:
-          SHELLCHECK_OPTS: -x -e SC1091 -e SC2155
-        with:
-          scandir: "./bin ./lib"
+        run: shellcheck -x -e SC1091 -e SC2155 bin/cfcn lib/*.sh install.sh
 
   bats:
     runs-on: ubuntu-latest

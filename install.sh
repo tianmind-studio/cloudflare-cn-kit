@@ -3,18 +3,18 @@
 # cloudflare-cn-kit (cfcn) installer.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/491034170/cloudflare-cn-kit/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/tianmind-studio/cloudflare-cn-kit/main/install.sh | bash
 #
 # Env:
 #   CFCN_PREFIX   Install prefix. Default: $HOME/.local
 #   CFCN_REF      Git ref. Default: main
-#   CFCN_REPO     GitHub repo slug. Default: 491034170/cloudflare-cn-kit
+#   CFCN_REPO     GitHub repo slug. Default: tianmind-studio/cloudflare-cn-kit
 
 set -euo pipefail
 
 CFCN_PREFIX="${CFCN_PREFIX:-$HOME/.local}"
 CFCN_REF="${CFCN_REF:-main}"
-REPO="${CFCN_REPO:-491034170/cloudflare-cn-kit}"
+REPO="${CFCN_REPO:-tianmind-studio/cloudflare-cn-kit}"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 

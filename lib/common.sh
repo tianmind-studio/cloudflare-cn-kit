@@ -6,6 +6,8 @@ if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
   C_RED=$'\033[31m' C_GREEN=$'\033[32m' C_YELLOW=$'\033[33m'
   C_CYAN=$'\033[36m' C_MAGENTA=$'\033[35m'
 else
+  # Used by sourced command modules; common.sh is also linted standalone.
+  # shellcheck disable=SC2034
   C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW="" C_CYAN="" C_MAGENTA=""
 fi
 
@@ -39,6 +41,12 @@ cfcn_render_table() {
   local rows
   rows="$(jq -r ".[] | $jq_expr" 2>/dev/null)"
   [[ -z "$rows" ]] && return 0
+  local cells=()
+  local cell
+  while IFS= read -r cell; do
+    [[ -z "$cell" ]] && cell="-"
+    cells+=("$cell")
+  done < <(printf '%s\n' "$rows" | awk -F '\t' '{for (i=1; i<=NF; i++) print $i}')
   # shellcheck disable=SC2059
-  printf "$fmt" $(printf '%s\n' "$rows" | awk -F '\t' '{for (i=1; i<=NF; i++) print $i}' | sed 's/^$/-/')
+  printf "$fmt" "${cells[@]}"
 }

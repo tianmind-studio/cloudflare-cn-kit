@@ -76,7 +76,7 @@ Environment:
   CFCN_TOKEN      Cloudflare API token (Zone:DNS:Edit + Zone:Zone:Read).
                   Or set CF_API_TOKEN (site-bootstrap compatible).
 
-Docs: https://github.com/491034170/cloudflare-cn-kit
+Docs: https://github.com/tianmind-studio/cloudflare-cn-kit
 EOF
 }
 
