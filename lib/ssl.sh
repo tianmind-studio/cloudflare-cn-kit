@@ -5,11 +5,22 @@ cfcn_ssl() {
   local sub="${1:-help}"; shift || true
   case "$sub" in
     diag)
-      local domain="${1:?usage: ssl diag <domain>}"
+      local domain="${1:?usage: ssl diag <domain> [--origin-ip <ip>]}"
+      shift || true
+      local origin_ip=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --origin-ip)
+            origin_ip="${2:?usage: ssl diag <domain> --origin-ip <ip>}"
+            shift 2
+            ;;
+          *) cfcn_err "unknown ssl diag option: $1"; return 2 ;;
+        esac
+      done
       # ssl diag needs the FQDN -> zone helper shared with DNS commands.
       # shellcheck source=lib/dns.sh
       source "$CFCN_LIB/dns.sh"
-      _cfcn_ssl_diag "$domain"
+      _cfcn_ssl_diag "$domain" "$origin_ip"
       ;;
     mode)
       # Alias to 'zone ssl'.
@@ -40,7 +51,7 @@ cfcn_ssl() {
       cat <<'EOF'
 cfcn ssl — TLS/HTTPS operations.
 
-  ssl diag <domain>        Diagnose redirect loops and Flexible-SSL traps.
+  ssl diag <domain> [--origin-ip <ip>]  Diagnose redirect loops and Flexible-SSL traps.
   ssl mode <zone> [mode]   Read or set SSL mode (off|flexible|full|strict).
   ssl hsts <zone> [on|off] Toggle HSTS.
 EOF
@@ -54,6 +65,8 @@ EOF
 # loop / Cloudfront 403 / plain 5xx depending on origin.
 _cfcn_ssl_diag() {
   local domain="$1"
+  local origin_ip_override="${2:-}"
+  local origin_ip="" origin_source=""
   cfcn_step "SSL diagnosis: $domain"
 
   # Step 1: what SSL mode is the zone in?
@@ -74,32 +87,93 @@ _cfcn_ssl_diag() {
     cfcn_info "ssl mode:  $ssl_mode"
   fi
 
-  # Step 2: is the DNS record proxied?
-  local proxied="?"
+  # Step 2: inspect the DNS record once: proxied state plus a possible origin IP.
+  local proxied="?" dns_record="[]" dns_lookup_failed=0 origin_skip_reason=""
   if [[ -n "$zid" ]]; then
-    proxied=$(cfcn_api GET "/zones/$zid/dns_records?name=$domain" 2>/dev/null \
-      | jq -r '.[0].proxied // false')
-    cfcn_info "proxied:   $proxied"
+    local dns_err_file dns_err
+    dns_err_file=$(mktemp)
+    if dns_record=$(cfcn_api GET "/zones/$zid/dns_records?name=$domain" 2>"$dns_err_file"); then
+      proxied=$(printf '%s' "$dns_record" | jq -r '.[0].proxied // false' 2>/dev/null || printf 'false')
+      cfcn_info "proxied:   $proxied"
+    else
+      dns_lookup_failed=1
+      dns_err=$(<"$dns_err_file")
+      dns_record="[]"
+      cfcn_warn "DNS record lookup failed; origin IP inference disabled."
+      [[ -n "$dns_err" ]] && cfcn_info "$dns_err"
+      cfcn_info "proxied:   ?"
+    fi
+    rm -f "$dns_err_file"
   fi
 
-  # Step 3: observe origin directly vs through CF.
-  cfcn_info "probing origin and edge..."
+  if [[ -n "$origin_ip_override" ]]; then
+    origin_ip="$origin_ip_override"
+    origin_source="--origin-ip"
+  elif [[ "$dns_lookup_failed" == "1" ]]; then
+    origin_skip_reason="DNS record lookup failed; use --origin-ip <ip>"
+  else
+    local origin_candidates origin_candidate_count
+    origin_candidates=$(printf '%s' "$dns_record" \
+      | jq -c '[.[]? | select(.proxied == true and (.type == "A" or .type == "AAAA") and ((.content // "") != ""))]' 2>/dev/null \
+      || printf '[]')
+    origin_candidate_count=$(printf '%s' "$origin_candidates" | jq -r 'length' 2>/dev/null || printf '0')
+
+    if [[ "$origin_candidate_count" -eq 1 ]]; then
+      origin_ip=$(printf '%s' "$origin_candidates" | jq -r '.[0].content')
+      origin_source=$(printf '%s' "$origin_candidates" | jq -r '"DNS " + .[0].type')
+    elif [[ "$origin_candidate_count" -gt 1 ]]; then
+      origin_skip_reason="multiple proxied A/AAAA records; use --origin-ip <ip>"
+    else
+      origin_skip_reason="use --origin-ip <ip> for CNAME/multi-origin cases"
+    fi
+  fi
+
+  # Step 3: observe Cloudflare edge and, when possible, the direct origin.
+  cfcn_info "probing edge and origin..."
   local http_status https_status edge_status https_headers curl_err
+  local origin_http_status="" origin_https_status="" origin_curl_err=""
+  local origin_https_insecure_status="" origin_https_reachable_despite_local_cert=0
   http_status=$(curl -sS -o /dev/null -w '%{http_code}' \
     -m 10 --connect-timeout 5 "http://$domain" 2>/dev/null || echo "ERR")
   # Capture headers AND code; also capture stderr for a later curl_err parse.
   local headers_file; headers_file=$(mktemp)
   https_status=$(curl -sS -o /dev/null -D "$headers_file" -w '%{http_code}' \
     -m 10 --connect-timeout 5 "https://$domain" 2>"${headers_file}.err" || echo "ERR")
-  https_headers=$(cat "$headers_file")
-  curl_err=$(cat "${headers_file}.err" 2>/dev/null)
+  https_headers=$(<"$headers_file")
+  curl_err=$(<"${headers_file}.err")
   rm -f "$headers_file" "${headers_file}.err"
   edge_status=$(curl -sS -o /dev/null -w '%{http_code}' \
     -m 10 --connect-timeout 5 -L --max-redirs 10 "https://$domain/" 2>/dev/null || echo "ERR")
 
-  cfcn_info "HTTP/80:   $http_status"
-  cfcn_info "HTTPS/443: $https_status"
-  cfcn_info "with -L:   $edge_status  (up to 10 redirects)"
+  cfcn_info "Edge HTTP/80:       $http_status"
+  cfcn_info "Edge HTTPS/443:     $https_status"
+  cfcn_info "Edge HTTPS with -L: $edge_status  (up to 10 redirects)"
+
+  if [[ -n "$origin_ip" ]]; then
+    cfcn_info "origin IP:          $origin_ip${origin_source:+ ($origin_source)}"
+    origin_http_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+      -m 10 --connect-timeout 5 --resolve "$domain:80:$origin_ip" \
+      "http://$domain" 2>/dev/null || echo "ERR")
+    local origin_headers_file; origin_headers_file=$(mktemp)
+    origin_https_status=$(curl -sS -o /dev/null -D "$origin_headers_file" -w '%{http_code}' \
+      -m 10 --connect-timeout 5 --resolve "$domain:443:$origin_ip" \
+      "https://$domain" 2>"${origin_headers_file}.err" || echo "ERR")
+    origin_curl_err=$(<"${origin_headers_file}.err")
+    rm -f "$origin_headers_file" "${origin_headers_file}.err"
+    cfcn_info "Origin HTTP/80:     $origin_http_status"
+    cfcn_info "Origin HTTPS/443:   $origin_https_status"
+    if printf '%s' "$origin_curl_err" | grep -qiE 'certificate problem|certificate verify|unable to get local issuer|self[- ]signed|not trusted|unknown ca|no alternative certificate|certificate has expired'; then
+      origin_https_insecure_status=$(curl -k -sS -o /dev/null -w '%{http_code}' \
+        -m 10 --connect-timeout 5 --resolve "$domain:443:$origin_ip" \
+        "https://$domain" 2>/dev/null || echo "ERR")
+      if [[ ! "$origin_https_insecure_status" =~ ^(000|000ERR|ERR)$ ]]; then
+        origin_https_reachable_despite_local_cert=1
+      fi
+      cfcn_info "Origin HTTPS/443 -k: $origin_https_insecure_status  (ignores local certificate trust)"
+    fi
+  else
+    cfcn_info "origin direct probe skipped (${origin_skip_reason:-use --origin-ip <ip> for CNAME/multi-origin cases})"
+  fi
 
   # Extract HSTS header if present.
   local hsts_header
@@ -125,15 +199,44 @@ _cfcn_ssl_diag() {
     cfcn_tip "    let CF 'Always Use HTTPS' do the redirect instead."
   fi
 
-  if [[ "$http_status" =~ ^30[1278]$ && "$https_status" == "ERR" && "$ssl_mode" != "off" ]]; then
+  if [[ -n "$origin_ip" && "$origin_http_status" =~ ^30[1278]$ && "$origin_https_status" =~ ^(000|000ERR|ERR)$ && "$origin_https_reachable_despite_local_cert" != "1" && "$ssl_mode" != "off" ]]; then
     hit=1
-    cfcn_warn "origin HTTP redirects, but HTTPS is unreachable."
-    cfcn_tip "Likely origin has no cert installed but nginx force-redirects to HTTPS."
+    cfcn_warn "direct origin HTTP redirects, but direct origin HTTPS is unreachable."
+    cfcn_tip "Likely origin has no valid cert installed while nginx force-redirects to HTTPS."
     cfcn_tip "  - If using CF Flexible: DON'T redirect on origin. Let CF redirect."
-    cfcn_tip "  - If using CF Full: install a cert on origin (certbot --nginx)."
+    cfcn_tip "  - If using CF Full/Strict: install or renew an origin cert."
+    if printf '%s' "$origin_curl_err" | grep -qiE 'timed out|timeout|connection refused|no route'; then
+      cfcn_tip "  - If your firewall only allows Cloudflare IPs, this direct probe may be blocked."
+    fi
+  elif [[ "$http_status" =~ ^30[1278]$ && "$https_status" =~ ^(000|000ERR|ERR)$ && "$ssl_mode" != "off" ]]; then
+    hit=1
+    cfcn_warn "edge HTTP redirects, but edge HTTPS is unreachable."
+    cfcn_tip "Run with --origin-ip <ip> if DNS is CNAME/multi-origin, so cfcn can"
+    cfcn_tip "separate Cloudflare edge behavior from direct-origin behavior."
   fi
 
-  if [[ "$edge_status" == "ERR" || "$edge_status" == "000" ]]; then
+  if [[ -n "$origin_ip" && "$origin_https_reachable_despite_local_cert" == "1" ]]; then
+    hit=1
+    cfcn_warn "direct origin HTTPS is reachable, but local curl does not trust the certificate."
+    cfcn_tip "This can be normal for a Cloudflare Origin CA certificate: Cloudflare trusts it,"
+    cfcn_tip "but your local OS/curl usually does not."
+    cfcn_tip "  - If this is not intentional, check the cert hostname, expiry, and CF 526 events."
+    cfcn_tip "  - The '-k' probe only proves TLS transport reaches the origin; it does not prove"
+    cfcn_tip "    public-browser trust."
+  elif [[ -n "$origin_ip" && "$ssl_mode" =~ ^(full|strict)$ && "$origin_https_status" =~ ^(000|000ERR|ERR)$ ]]; then
+    hit=1
+    cfcn_warn "direct origin HTTPS failed while SSL mode is '$ssl_mode'."
+    cfcn_tip "Cloudflare Full/Strict needs the origin to answer HTTPS correctly."
+    cfcn_tip "  - Fix: install/renew an origin cert (certbot or Cloudflare Origin CA)."
+    cfcn_tip "  - Check nginx/apache is listening on 443 for this hostname."
+    if printf '%s' "$origin_curl_err" | grep -qiE 'certificate|ssl|handshake'; then
+      cfcn_tip "  - curl saw a TLS/certificate error from direct origin: ${origin_curl_err:-(empty)}"
+    elif printf '%s' "$origin_curl_err" | grep -qiE 'timed out|timeout|connection refused|no route'; then
+      cfcn_tip "  - If your firewall only allows Cloudflare IPs, direct probing from here may be blocked."
+    fi
+  fi
+
+  if [[ "$edge_status" =~ ^(000|000ERR|ERR)$ ]]; then
     hit=1
     cfcn_warn "even following redirects from a fresh client: unreachable."
     cfcn_tip "Possible: DNS not propagated, firewall blocking 443, CF zone paused."
@@ -142,7 +245,7 @@ _cfcn_ssl_diag() {
   # Pattern: CN ISP returning an empty reply on 443 despite proxied=true.
   # Refined — distinguish RST ("Connection reset") from timeout ("Operation timed
   # out") from handshake failure so the advice can be specific.
-  if [[ "$https_status" == "000" && "$proxied" == "true" ]]; then
+  if [[ "$https_status" =~ ^000 && "$proxied" == "true" ]]; then
     hit=1
     if printf '%s' "$curl_err" | grep -qiE 'connection reset|recv failure|rst'; then
       cfcn_warn "https returned 000 with connection reset, going through CF's proxy."

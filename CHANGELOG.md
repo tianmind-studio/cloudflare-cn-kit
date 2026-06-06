@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.3] — origin-aware SSL diagnostics
+
+### Added
+- `cfcn ssl diag <domain> [--origin-ip <ip>]` now separates Cloudflare edge
+  probes from direct-origin probes.
+  - For proxied A/AAAA records, `cfcn` infers the origin IP from the DNS
+    record and probes it with `curl --resolve`.
+  - For proxied CNAME, load balancer, or multi-origin setups, operators can
+    pass `--origin-ip <ip>` to run the same direct-origin probe explicitly.
+- Diagnostic output now labels `Edge HTTP/80`, `Edge HTTPS/443`,
+  `Edge HTTPS with -L`, `Origin HTTP/80`, and `Origin HTTPS/443` separately,
+  so Flexible-SSL loops, origin certificate failures, and CN edge-path issues
+  are less likely to be confused.
+
+### Changed
+- Flexible SSL warnings remain read-only, but direct-origin results now make
+  the advice more precise: origin-side HTTP→HTTPS redirects plus broken origin
+  HTTPS are called out as an origin redirect/TLS setup problem.
+
 ## [0.1.2] — diagnostic + workflow release
 
 ### Added
